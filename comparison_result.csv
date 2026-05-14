@@ -1,0 +1,7 @@
+method,rank,Name,Brand,Main_Accords,Top_Notes,Middle_Notes,Base_Notes,similarity_score
+TF-IDF,1,Juwita Malam,Ucca,"Floral, Woody, Spicy, Resinous, Creamy",,,,0.24496863626160853
+TF-IDF,2,Courtesans - Mata Hari,Wild Hybrid,,,,,0.23331158253692097
+TF-IDF,3,Vanille Molinard 2015 Eau de Parfum,Molinard,"Gourmand, Sweet, Powdery, Creamy, Spicy",Vanilla blossom,Vanilla,"Vanilla, Benzoin",0.055593700629768546
+Sentence-Transformer,1,Intimate Vanilla,Neil Morris Fragrances,"Powdery, Fresh, Floral, Sweet, Fruity","Bergamot, Lotus","Green tea, Night-blooming jasmine","Amber, Bourbon vanilla, Frankincense, French vanilla, Musk",0.6917867064476013
+Sentence-Transformer,2,A Study in Brown,Deep Midnight Perfumes,,"Bergamot, Lemon, Rosemary","Violet, Lavender, Tonka bean, Decay","Patchouli, Vanilla, Vetiver, Skunk",0.6519243717193604
+Sentence-Transformer,3,Amber Vanilla,Scentual Aroma,"Floral, Powdery, Sweet, Smoky",,,,0.6443942189216614
