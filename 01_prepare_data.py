@@ -1,15 +1,9 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split
 
 
 DATASET_URL = "https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-12-10/parfumo_data_clean.csv"
 
-OUTPUT_ALL = "parfumo_text_profile.csv"
-OUTPUT_TRAIN = "parfumo_train.csv"
-OUTPUT_TEST = "parfumo_test.csv"
-
-TEST_SIZE = 0.2
-RANDOM_STATE = 42
+OUTPUT_FILE = "parfumo_text_profile.csv"
 
 
 def main():
@@ -56,13 +50,13 @@ def main():
     after_filter = len(df_selected)
     removed_data = before_filter - after_filter
 
-    print("\nJumlah data sebelum filter aroma:")
+    print("\nJumlah data sebelum filter aroma kosong:")
     print(before_filter)
 
-    print("\nJumlah data setelah filter aroma:")
+    print("\nJumlah data setelah filter aroma kosong:")
     print(after_filter)
 
-    print("\nJumlah data yang dihapus karena tidak memiliki informasi aroma:")
+    print("\nJumlah data yang dihapus karena tidak memiliki informasi aroma sama sekali:")
     print(removed_data)
 
     df_selected = df_selected.reset_index(drop=True)
@@ -77,33 +71,23 @@ def main():
         "Base notes: " + df_selected["Base_Notes"].astype(str)
     )
 
-    train_df, test_df = train_test_split(
-        df_selected,
-        test_size=TEST_SIZE,
-        random_state=RANDOM_STATE,
-        shuffle=True
+    df_selected.to_csv(OUTPUT_FILE, index=False, encoding="utf-8-sig")
+
+    print(f"\nBerhasil membuat file: {OUTPUT_FILE}")
+    print("\nContoh data hasil preprocessing:")
+    print(
+        df_selected[
+            [
+                "perfume_id",
+                "Name",
+                "Brand",
+                "Main_Accords",
+                "Top_Notes",
+                "Middle_Notes",
+                "Base_Notes",
+            ]
+        ].head()
     )
-
-    train_df = train_df.reset_index(drop=True)
-    test_df = test_df.reset_index(drop=True)
-
-    df_selected.to_csv(OUTPUT_ALL, index=False, encoding="utf-8-sig")
-    train_df.to_csv(OUTPUT_TRAIN, index=False, encoding="utf-8-sig")
-    test_df.to_csv(OUTPUT_TEST, index=False, encoding="utf-8-sig")
-
-    print("\nBerhasil membuat file:")
-    print(f"1. {OUTPUT_ALL}")
-    print(f"2. {OUTPUT_TRAIN}")
-    print(f"3. {OUTPUT_TEST}")
-
-    print("\nJumlah data training:")
-    print(len(train_df))
-
-    print("\nJumlah data testing:")
-    print(len(test_df))
-
-    print("\nContoh data testing:")
-    print(test_df[["perfume_id", "Name", "Brand", "Main_Accords"]].head())
 
 
 if __name__ == "__main__":

@@ -18,9 +18,8 @@ from sentence_transformers import SentenceTransformer
 # KONFIGURASI
 # =========================
 
-DATA_TRAIN_PATH = "parfumo_train.csv"
-DATA_TEST_PATH = "parfumo_test.csv"
-EMBEDDING_PATH = "sentence_transformer_test_embeddings.npy"
+DATA_PATH = "parfumo_text_profile.csv"
+EMBEDDING_PATH = "sentence_transformer_embeddings.npy"
 
 MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 TOP_K = 3
@@ -208,8 +207,8 @@ def save_feedback_to_gsheet(
             age_range,
             experience_level,
             desired_query,
-            "",  # excluded_input dikosongkan karena filtering dihapus
-            "",  # excluded_notes dikosongkan karena filtering dihapus
+            "",
+            "",
             row["method"],
             int(row["rank"]),
             str(row["Name"]),
@@ -230,9 +229,8 @@ def save_feedback_to_gsheet(
 # =========================
 
 @st.cache_data
-def load_split_data():
-    train_df = pd.read_csv(DATA_TRAIN_PATH)
-    test_df = pd.read_csv(DATA_TEST_PATH)
+def load_data():
+    df = pd.read_csv(DATA_PATH)
 
     columns = [
         "Name",
@@ -244,26 +242,24 @@ def load_split_data():
         "text_profile"
     ]
 
-    for df in [train_df, test_df]:
-        for col in columns:
-            if col in df.columns:
-                df[col] = df[col].fillna("").astype(str)
+    for col in columns:
+        if col in df.columns:
+            df[col] = df[col].fillna("").astype(str)
 
-    return train_df, test_df
+    return df
 
 
 @st.cache_resource
-def build_tfidf(train_text_profiles, test_text_profiles):
+def build_tfidf(text_profiles):
     vectorizer = TfidfVectorizer(
         lowercase=True,
         stop_words="english",
         ngram_range=(1, 2)
     )
 
-    vectorizer.fit(train_text_profiles)
-    test_tfidf_matrix = vectorizer.transform(test_text_profiles)
+    tfidf_matrix = vectorizer.fit_transform(text_profiles)
 
-    return vectorizer, test_tfidf_matrix
+    return vectorizer, tfidf_matrix
 
 
 @st.cache_resource
@@ -272,7 +268,7 @@ def load_sentence_model():
 
 
 @st.cache_data
-def load_or_create_test_embeddings(test_text_profiles):
+def load_or_create_embeddings(text_profiles):
     model = SentenceTransformer(MODEL_NAME)
 
     recompute = True
@@ -280,12 +276,12 @@ def load_or_create_test_embeddings(test_text_profiles):
     if os.path.exists(EMBEDDING_PATH):
         embeddings = np.load(EMBEDDING_PATH)
 
-        if embeddings.shape[0] == len(test_text_profiles):
+        if embeddings.shape[0] == len(text_profiles):
             recompute = False
 
     if recompute:
         embeddings = model.encode(
-            list(test_text_profiles),
+            list(text_profiles),
             batch_size=32,
             show_progress_bar=True,
             normalize_embeddings=True
@@ -329,15 +325,15 @@ def prepare_query_for_modeling(desired_query):
 # REKOMENDASI
 # =========================
 
-def recommend_tfidf(desired_query, test_df, vectorizer, test_tfidf_matrix, top_k=3):
+def recommend_tfidf(desired_query, df, vectorizer, tfidf_matrix, top_k=3):
     processed_query = prepare_query_for_modeling(desired_query)
 
     query_vector = vectorizer.transform([processed_query])
-    similarity_scores = cosine_similarity(query_vector, test_tfidf_matrix).flatten()
+    similarity_scores = cosine_similarity(query_vector, tfidf_matrix).flatten()
 
     top_indices = similarity_scores.argsort()[::-1][:top_k]
 
-    results = test_df.iloc[top_indices].copy()
+    results = df.iloc[top_indices].copy()
     results["method"] = "TF-IDF"
     results["rank"] = range(1, top_k + 1)
     results["similarity_score"] = similarity_scores[top_indices]
@@ -345,7 +341,7 @@ def recommend_tfidf(desired_query, test_df, vectorizer, test_tfidf_matrix, top_k
     return results
 
 
-def recommend_sentence_transformer(desired_query, test_df, model, test_embeddings, top_k=3):
+def recommend_sentence_transformer(desired_query, df, model, embeddings, top_k=3):
     processed_query = prepare_query_for_modeling(desired_query)
 
     query_embedding = model.encode(
@@ -353,11 +349,11 @@ def recommend_sentence_transformer(desired_query, test_df, model, test_embedding
         normalize_embeddings=True
     )
 
-    similarity_scores = np.dot(query_embedding, test_embeddings.T).flatten()
+    similarity_scores = np.dot(query_embedding, embeddings.T).flatten()
 
     top_indices = similarity_scores.argsort()[::-1][:top_k]
 
-    results = test_df.iloc[top_indices].copy()
+    results = df.iloc[top_indices].copy()
     results["method"] = "Sentence-Transformer"
     results["rank"] = range(1, top_k + 1)
     results["similarity_score"] = similarity_scores[top_indices]
@@ -462,22 +458,19 @@ def main():
             """
         )
 
-    with st.spinner("Memuat data training, data testing, dan model..."):
-        train_df, test_df = load_split_data()
+    with st.spinner("Memuat dataset dan model..."):
+        df = load_data()
 
-        vectorizer, test_tfidf_matrix = build_tfidf(
-            tuple(train_df["text_profile"].tolist()),
-            tuple(test_df["text_profile"].tolist())
+        vectorizer, tfidf_matrix = build_tfidf(
+            tuple(df["text_profile"].tolist())
         )
 
         sentence_model = load_sentence_model()
-        test_embeddings = load_or_create_test_embeddings(
-            tuple(test_df["text_profile"].tolist())
+        embeddings = load_or_create_embeddings(
+            tuple(df["text_profile"].tolist())
         )
 
-    st.success(
-        f"Data berhasil dimuat. Training: {len(train_df)} parfum | Testing kandidat rekomendasi: {len(test_df)} parfum"
-    )
+    st.success(f"Dataset berhasil dimuat: {len(df)} parfum")
 
     st.subheader("Data Responden")
 
@@ -531,21 +524,24 @@ def main():
             st.write(processed_query)
 
             st.write("Catatan:")
-            st.write("Rekomendasi diambil dari data testing, sedangkan TF-IDF di-fit menggunakan data training.")
+            st.write(
+                "Seluruh dataset bersih digunakan sebagai kandidat rekomendasi karena dataset Parfumo "
+                "tidak memiliki label evaluasi pengguna. Evaluasi diperoleh dari penilaian responden."
+            )
 
         tfidf_results = recommend_tfidf(
             desired_query=desired_query,
-            test_df=test_df,
+            df=df,
             vectorizer=vectorizer,
-            test_tfidf_matrix=test_tfidf_matrix,
+            tfidf_matrix=tfidf_matrix,
             top_k=TOP_K
         )
 
         st_results = recommend_sentence_transformer(
             desired_query=desired_query,
-            test_df=test_df,
+            df=df,
             model=sentence_model,
-            test_embeddings=test_embeddings,
+            embeddings=embeddings,
             top_k=TOP_K
         )
 
