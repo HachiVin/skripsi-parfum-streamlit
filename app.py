@@ -86,9 +86,18 @@ st.markdown(
         font-weight: 700;
     }
 
+    .method-section {
+        margin-top: 22px;
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background-color: rgba(126, 200, 255, 0.08);
+        border: 1px solid rgba(126, 200, 255, 0.25);
+    }
+
     .score-wrapper {
         margin-bottom: 28px;
-        padding-bottom: 12px;
+        padding-bottom: 14px;
         border-bottom: 1px solid rgba(180, 180, 180, 0.2);
     }
 
@@ -207,8 +216,8 @@ def save_feedback_to_gsheet(
             age_range,
             experience_level,
             desired_query,
-            "",
-            "",
+            "",  # excluded_input dikosongkan karena filtering tidak digunakan
+            "",  # excluded_notes dikosongkan karena filtering tidak digunakan
             row["method"],
             int(row["rank"]),
             str(row["Name"]),
@@ -406,7 +415,7 @@ def render_recommendation_with_score(row, key):
 
     score = st.selectbox(
         "Nilai relevansi parfum ini:",
-        [0, 1, 2],
+        ["Pilih nilai", 0, 1, 2],
         key=key,
         help="0 = tidak relevan, 1 = cukup relevan, 2 = sangat relevan"
     )
@@ -448,6 +457,7 @@ def main():
             3. Klik tombol **Tampilkan Rekomendasi**.
             4. Baca informasi parfum yang muncul.
             5. Berikan nilai relevansi pada setiap parfum yang direkomendasikan.
+            6. Pastikan semua nilai relevansi sudah dipilih, lalu klik **Simpan Penilaian**.
             """
         )
 
@@ -567,55 +577,74 @@ def main():
         token = st.session_state.get("recommendation_token", "default")
 
         with st.form("feedback_form"):
-            tab_tfidf, tab_st = st.tabs(["TF-IDF", "Sentence-Transformer"])
-
             tfidf_scores = []
             st_scores = []
 
-            with tab_tfidf:
-                st.markdown("### TF-IDF")
-                for idx, row in st.session_state["tfidf_results"].reset_index(drop=True).iterrows():
-                    score = render_recommendation_with_score(
-                        row,
-                        key=f"{token}_tfidf_score_{idx}"
-                    )
-                    tfidf_scores.append(score)
+            st.markdown(
+                """
+                <div class="method-section">
+                    <h3>1. Penilaian Hasil Rekomendasi TF-IDF</h3>
+                    <p>Berikan nilai relevansi untuk tiga parfum hasil rekomendasi metode TF-IDF.</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-            with tab_st:
-                st.markdown("### Sentence-Transformer")
-                for idx, row in st.session_state["st_results"].reset_index(drop=True).iterrows():
-                    score = render_recommendation_with_score(
-                        row,
-                        key=f"{token}_st_score_{idx}"
-                    )
-                    st_scores.append(score)
+            for idx, row in st.session_state["tfidf_results"].reset_index(drop=True).iterrows():
+                score = render_recommendation_with_score(
+                    row,
+                    key=f"{token}_tfidf_score_{idx}"
+                )
+                tfidf_scores.append(score)
 
-            scores = tfidf_scores + st_scores
+            st.markdown(
+                """
+                <div class="method-section">
+                    <h3>2. Penilaian Hasil Rekomendasi Sentence-Transformer</h3>
+                    <p>Berikan nilai relevansi untuk tiga parfum hasil rekomendasi metode Sentence-Transformer.</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            for idx, row in st.session_state["st_results"].reset_index(drop=True).iterrows():
+                score = render_recommendation_with_score(
+                    row,
+                    key=f"{token}_st_score_{idx}"
+                )
+                st_scores.append(score)
+
+            all_scores = tfidf_scores + st_scores
 
             submit = st.form_submit_button("Simpan Penilaian")
 
             if submit:
-                try:
-                    save_feedback_to_gsheet(
-                        respondent_id=st.session_state["respondent_id"],
-                        gender=gender,
-                        age_range=age_range,
-                        experience_level=experience_level,
-                        desired_query=st.session_state["desired_query"],
-                        tfidf_results=st.session_state["tfidf_results"],
-                        st_results=st.session_state["st_results"],
-                        scores=scores
+                if "Pilih nilai" in all_scores:
+                    st.warning(
+                        "Mohon lengkapi semua nilai relevansi terlebih dahulu sebelum menyimpan."
                     )
+                else:
+                    try:
+                        save_feedback_to_gsheet(
+                            respondent_id=st.session_state["respondent_id"],
+                            gender=gender,
+                            age_range=age_range,
+                            experience_level=experience_level,
+                            desired_query=st.session_state["desired_query"],
+                            tfidf_results=st.session_state["tfidf_results"],
+                            st_results=st.session_state["st_results"],
+                            scores=all_scores
+                        )
 
-                    st.success(
-                        "Penilaian berhasil disimpan ke Google Sheets. Terima kasih sudah menjadi responden."
-                    )
+                        st.success(
+                            "Penilaian berhasil disimpan ke Google Sheets. Terima kasih sudah menjadi responden."
+                        )
 
-                    st.session_state["respondent_id"] = generate_respondent_id()
+                        st.session_state["respondent_id"] = generate_respondent_id()
 
-                except Exception as error:
-                    st.error("Gagal menyimpan data ke Google Sheets.")
-                    st.write(error)
+                    except Exception as error:
+                        st.error("Gagal menyimpan data ke Google Sheets.")
+                        st.write(error)
 
 
 if __name__ == "__main__":
